@@ -6,7 +6,6 @@ __pycache__/
 # C extensions
 *.so
 more_implemenntation.txt
-PUBLISHING_GUIDE.md
 # Distribution / packaging
 .Python
 build/
@@ -53,6 +52,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+# Coverage data files
+.coverage*
 
 # Translations
 *.mo
@@ -80,6 +81,9 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+# Jupyter notebook outputs
+*_files/
+untitled*.ipynb
 
 # IPython
 profile_default/
@@ -161,14 +165,77 @@ cython_debug/
 #  project, it is also recommended to add the following lines:
 #  .idea/
 
+# Additional Python cache
+*.py[cod]
+*$py.class
+*.so
+.Python
+# Compiled Python files
+*.pyc
+*.pyo
+
+# Large notebook files (>1MB) - keep only essential ones
+# Uncomment if you want to ignore large notebooks:
+# *.ipynb
+# !example_notebook.ipynb
+
+# Documentation generation files
+_build/
+.doctrees/
+docs/_build/
+
+# Package manager files
+poetry.lock
+Pipfile.lock
+conda-lock.yml
+
+# Environment variables
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Configuration files with sensitive data
+config.ini
+secrets.json
+credentials.json
+.secrets
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Development tools
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS specific files
+Thumbs.db
+.DS_Store
+desktop.ini
+
 # dskit specific
+# Data files (but keep important sample data)
 *.csv
+!dummy_data.csv
+!comprehensive_dummy_data.csv
 !requirements.txt
 *.xlsx
 *.json
 *.parquet
+# Generated outputs
 plots/
 profile_report.html
+*.html
+!docs/**/*.html
 experiments/
 .DS_Store
 
@@ -180,6 +247,10 @@ working_demo.py
 quick_test.py
 validate_*.py
 create_comprehensive_data.py
+setup.py
+setup_publishing.py
+publishing_checklist.py
+final_validation.py
 
 # PyPI publishing files
 *.whl
@@ -197,6 +268,10 @@ validate_package_fixed.py
 *.swo
 *~
 .idea/
+# VS Code settings (allow workspace settings but ignore user settings)
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
 
 # OS generated files
 Thumbs.db
@@ -205,7 +280,22 @@ Desktop.ini
 
 # Test outputs
 test_output/
+# Machine learning artifacts
 *.pkl
+*.joblib
+*.h5
+*.hdf5
+models/
+checkpoints/
+# Visualization outputs
+*.png
+*.jpg
+*.jpeg
+*.svg
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!docs/**/*.svg
 
 # Backup files
 *.bak
@@ -219,4 +309,18 @@ test_output/
 # Temporary files
 *.tmp
 *.temp
+# Model files
+*.pkl
+*.joblib
+*.model
+# Data processing cache
+*.cache
+*.db
+*.sqlite
+*.sqlite3
+PUBLISHING_GUIDE.md
+BUGFIX_SUMMARY_v1.0.3.md
+BUGFIX_SUMMARY_v1.0.5.md
+API_REFERENCE.md
+BUGFIX_SUMMARY_v1.0.4.md
 READY_TO_PUBLISH.md

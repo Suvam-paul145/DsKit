@@ -1,0 +1,17 @@
+id,Name,Age,Salary,Join Date,Department,Performance Score
+1,John Doe,28,50000,2020-01-15,IT,8.5
+2,Jane Smith,34,60000,2019-03-20,HR,9.0
+3,Bob Johnson,45,80000,2015-06-10,Finance,7.8
+4,Alice Brown,29,55000,2021-07-01,IT,8.2
+5,Charlie Davis,31,NaN,2018-11-05,Marketing,6.5
+6,Eve Wilson,NaN,70000,2017-09-12,Finance,8.8
+7,Frank Miller,38,72000,2016-04-25,HR,7.5
+8,Grace Lee,26,48000,2022-02-14,Marketing,9.2
+9,Henry Taylor,50,90000,2010-12-01,IT,8.0
+10,Ivy Clark,30,58000,2020-08-19,Finance,NaN
+11,Jack White,33,62000,2019-05-30,HR,7.9
+12,Kevin Hall,27,51000,2021-11-11,IT,8.4
+13,Laura Scott,40,75000,2014-02-28,Marketing,8.1
+14,Mike Adams,35,68000,2018-01-20,Finance,7.6
+15,Nina Baker,29,56000,2021-04-15,HR,8.9
+100,Outlier User,150,1000000,2023-01-01,IT,1.0

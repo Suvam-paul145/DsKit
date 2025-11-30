@@ -451,30 +451,31 @@ if "target" in kit.df.columns:
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-```bash
-git clone https://github.com/Programmers-Paradise/DsKit.git
-cd DsKit
-pip install -e .[dev,full]
-pre-commit install
-```
-
-### Running Tests
-
-```bash
-pytest tests/ --cov=dskit --cov-report=html  # If tests directory exists
-```
-
----
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 📚 Complete Documentation
+
+For comprehensive guides, implementation details, and technical documentation, visit our organized documentation center:
+
+**[📁 docs/ - Complete Documentation Center](docs/README.md)**
+
+### Key Documentation Highlights
+
+- **[Feature Engineering Implementation Guide](docs/FEATURE_ENGINEERING_IMPLEMENTATION_GUIDE.md)** - Deep dive into how dskit creates features and backend implementation
+- **[Complete ML Pipeline Comparison](docs/COMPLETE_ML_PIPELINE_COMPARISON.md)** - Traditional vs Dskit approaches with 61% code reduction analysis
+- **[Executive Summary](docs/EXECUTIVE_SUMMARY.md)** - High-level overview and benefits
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation
+- **[Quick Test Summary](docs/QUICK_TEST_SUMMARY.md)** - Getting started guide
+
+### Notebooks & Examples
+
+- `complete_ml_dskit.ipynb` - Complete ML pipeline using dskit
+- `complete_ml_traditional.ipynb` - Traditional ML pipeline for comparison
+- `dskit_vs_traditional_comparison.ipynb` - Side-by-side comparison
 
 ---
 
