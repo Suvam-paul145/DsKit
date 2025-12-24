@@ -38,6 +38,30 @@ The library remains:
 
 ---
 
+## 🎓 Learning Resources
+
+### 📚 New to dskit? Start here!
+
+1. **[Quick Start Guide](#-quick-start)** - Get up and running in minutes
+2. **[Demo Suite](demos/)** - 12 comprehensive demos covering all features
+   - Start with [01_data_io_demo.py](demos/01_data_io_demo.py)
+   - Progress through [12_complete_pipeline_demo.py](demos/12_complete_pipeline_demo.py)
+3. **[API Reference](docs/API_REFERENCE.md)** - Detailed function documentation
+4. **[Example Notebooks](.)** - Jupyter notebooks with real-world examples
+
+### 🚀 Try It Now
+
+```bash
+# Install dskit
+pip install Ak-dskit
+
+# Run your first demo
+cd demos
+python 01_data_io_demo.py
+```
+
+---
+
 ## 📦 Installation
 
 ### From PyPI (Recommended)
@@ -277,6 +301,53 @@ dskit.compare_algorithm_hyperplanes(models, X, y)
 ### 🧩 IMPLEMENTED FEATURES (All Tasks Complete)
 
 Each task below is numbered and written in simple language with enough theory so that any contributor — even new ones — can understand exactly what to build.
+
+---
+
+## 🎯 Demos & Examples
+
+### 📁 Comprehensive Demo Suite
+
+We've created **12 detailed demo files** showcasing every major feature of dskit! Each demo is self-contained, well-documented, and includes practical examples.
+
+**[👉 Explore the Demos Folder](demos/)**
+
+#### Core Functionality Demos (1-6)
+
+| Demo                                                       | Description          | Key Features                                         |
+| ---------------------------------------------------------- | -------------------- | ---------------------------------------------------- |
+| [01_data_io_demo.py](demos/01_data_io_demo.py)             | Data I/O Operations  | Load/save CSV, Excel, JSON, Parquet, batch loading   |
+| [02_data_cleaning_demo.py](demos/02_data_cleaning_demo.py) | Data Cleaning        | Type fixing, missing values, outliers, text cleaning |
+| [03_eda_demo.py](demos/03_eda_demo.py)                     | Exploratory Analysis | Statistics, health checks, comprehensive EDA         |
+| [04_visualization_demo.py](demos/04_visualization_demo.py) | Visualizations       | Histograms, boxplots, correlations, pairplots        |
+| [05_preprocessing_demo.py](demos/05_preprocessing_demo.py) | Preprocessing        | Encoding, scaling, train-test split                  |
+| [06_modeling_demo.py](demos/06_modeling_demo.py)           | ML Modeling          | Training, comparison, tuning, evaluation             |
+
+#### Advanced Feature Demos (7-12)
+
+| Demo                                                                         | Description         | Key Features                                    |
+| ---------------------------------------------------------------------------- | ------------------- | ----------------------------------------------- |
+| [07_feature_engineering_demo.py](demos/07_feature_engineering_demo.py)       | Feature Engineering | Polynomial, date features, PCA, target encoding |
+| [08_nlp_demo.py](demos/08_nlp_demo.py)                                       | NLP Utilities       | Text stats, cleaning, features, sentiment       |
+| [09_advanced_visualization_demo.py](demos/09_advanced_visualization_demo.py) | Advanced Plots      | Feature importance, correlations, patterns      |
+| [10_automl_demo.py](demos/10_automl_demo.py)                                 | AutoML              | Random/Grid/Bayesian search, optimization       |
+| [11_hyperplane_demo.py](demos/11_hyperplane_demo.py)                         | Hyperplanes         | SVM, logistic regression visualization          |
+| [12_complete_pipeline_demo.py](demos/12_complete_pipeline_demo.py)           | End-to-End          | Complete ML workflow from data to deployment    |
+
+#### Quick Start with Demos
+
+```bash
+# Navigate to demos folder
+cd demos
+
+# Run a specific demo
+python 01_data_io_demo.py
+
+# Run all demos interactively
+python run_all_demos.py
+```
+
+**[📖 Full Demo Documentation](demos/README.md)**
 
 ---
 
