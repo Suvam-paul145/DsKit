@@ -241,7 +241,7 @@ experiments/
 
 # Test and demo files
 test_*.py
-*_demo.py
+# *_demo.py
 sample_script.py
 working_demo.py
 quick_test.py
@@ -323,3 +323,5 @@ BUGFIX_SUMMARY_v1.0.3.md
 BUGFIX_SUMMARY_v1.0.5.md
 BUGFIX_SUMMARY_v1.0.4.md
 READY_TO_PUBLISH.md
+setup.py
+.setup.py
