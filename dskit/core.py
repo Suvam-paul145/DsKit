@@ -1,7 +1,7 @@
 import pandas as pd
 from . import io, cleaning, visualization, preprocessing, modeling, explainability, eda
 from . import feature_engineering, nlp_utils, advanced_visualization, advanced_modeling, auto_ml, comprehensive_eda
-from typing import Literal
+from typing import Literal,Optional,Annotated
 class dskit:
     def __init__(self, df=None):
         self.df = df
@@ -55,8 +55,8 @@ class dskit:
         self.df = cleaning.simple_nlp_clean(self.df, text_cols)
         return self
     
-    def advanced_text_clean(self, text_cols=None, remove_urls=True, remove_emails=True, remove_numbers=False, expand_contractions=True,auto_smart_cleaning:bool=False,language:str='english'):
-        self.df = nlp_utils.advanced_text_clean(self.df, text_cols, remove_urls, remove_emails, remove_numbers, expand_contractions, auto_smart_cleaning,language)
+    def advanced_text_clean(self, text_cols=None, remove_urls=True, remove_emails=True, remove_numbers=False, expand_contractions=True):
+        self.df = nlp_utils.advanced_text_clean(self.df, text_cols, remove_urls, remove_emails, remove_numbers, expand_contractions)
         return self
     
     def extract_text_features(self, text_cols=None):
@@ -75,7 +75,45 @@ class dskit:
         return self
     def generate_vocabulary(self,text_col:str,case:Literal['lower','upper']=None):
         return nlp_utils.generate_vocabulary(self.df,text_col,case)
-
+    def apply_nltk(
+            self,
+            text_column:Annotated[str, "Column name containing raw text"],
+            output_column:Annotated[str, "Output column name for processed text"] = "cleaned_nltk",
+            apply_case:Annotated[
+                Optional[Literal['lower','upper','sentence','title']],
+                "Case transformation to apply"
+            ] = 'lower',
+            allow_download:Annotated[bool,"Automatically download required NLTK resources if missing"]=False,
+            remove_stopwords:Annotated[bool,"Remove stopwords using NLTK stopword corpus"]=True,
+            keep_words:Annotated[
+                list[str],
+                "Words to retain even if stopword removal is enabled"
+            ] = ["not", "no", "off"],
+            remove_words:Annotated[
+                list[str],
+                "Words to explicitly remove from the text"
+                ]=[],
+            use_tokenizer:Annotated[bool,"Use NLTK tokenizer instead of simple whitespace split"]=True,
+            language:Annotated[str,"Language for stopword removal"]='english',
+            canonicalization:Annotated[
+                Optional[Literal['stemming', 'lemmatization']],
+                "Canonicalization strategy"
+                ]='stemming'
+        )->pd.DataFrame:
+        self.df = nlp_utils.apply_nltk(
+            df=self.df,
+            text_column=text_column,
+            output_column=output_column,
+            apply_case=apply_case,
+            allow_download=allow_download,
+            remove_stopwords=remove_stopwords,
+            keep_words=keep_words,
+            remove_words=remove_words,
+            use_tokenizer=use_tokenizer,
+            language=language,
+            canonicalization=canonicalization
+        )
+        return self
     def clean(self):
         """
         Chains multiple cleaning steps: fix_dtypes -> rename_columns -> fill_missing

@@ -1,19 +1,19 @@
 import pandas as pd
 import numpy as np
-from typing import Literal
+from typing import Literal, Optional, Iterable, Callable
+from collections import OrderedDict
+import re
+import warnings
+import importlib
+import string
+import matplotlib.pyplot as plt
 try:
-    import nltk
-    from nltk import WordNetLemmatizer
-    from nltk.corpus import stopwords
     from textblob import TextBlob
     from wordcloud import WordCloud
 except ImportError:
-    nltk = None
     TextBlob = None
     WordCloud = None
-import re
-import string
-import matplotlib.pyplot as plt
+
 
 def basic_text_stats(df, text_cols=None):
     """
@@ -40,7 +40,7 @@ def basic_text_stats(df, text_cols=None):
     return pd.DataFrame(stats).T
 
 def advanced_text_clean(df, text_cols=None, remove_urls=True, remove_emails=True, 
-                       remove_numbers=False, expand_contractions=True, auto_smart_cleaning:bool=False,language:str='english'):
+                       remove_numbers=False, expand_contractions=True):
     """
     Advanced text cleaning with more options.
     """
@@ -76,29 +76,7 @@ def advanced_text_clean(df, text_cols=None, remove_urls=True, remove_emails=True
             }
             for contraction, expansion in contractions.items():
                 text_series = text_series.str.replace(contraction, expansion, case=False)
-        if auto_smart_cleaning: # applies nltk for removing common words and uses word lemmatization
-            try:
-                nltk.download('stopwords') # download stopwords
-                nltk.download('punkt_tab') # download punkt
-                nltk.download('wordnet') # download wordnet
-                all_stopwords = stopwords.words(language) # load stopwords
-                for remove_stop in ['no', 'not', 'off']: # removing from stopwords
-                    all_stopwords.remove(remove_stop)
-                lemmatizer = WordNetLemmatizer() #lamitizer
-                
-                # Function to lemmatize and remove stopwords
-                def lemmatize_text(text):
-                    from nltk.tokenize import word_tokenize
-                    words = word_tokenize(text.lower())  # Lowercase for better lemmatization
-                    lemmatized_words = [lemmatizer.lemmatize(word) for word in words if word not in all_stopwords]
-                    return ' '.join(lemmatized_words)
-                
-                # Apply lemmatization to the text series
-                text_series = text_series.apply(lemmatize_text)
-                
-            except Exception as e:
-                print(f"Advanced cleaning failed: {e}")
-                pass
+        
         # Remove extra whitespace
         text_series = text_series.str.replace(r'\s+', ' ', regex=True).str.strip()
         
@@ -283,3 +261,239 @@ def generate_vocabulary(df:pd.DataFrame,text_col:str,case:Literal['lower','upper
             vocabulary.add(t)
     return list(vocabulary)
 
+
+
+# nltk application
+_init_nltk_cache=OrderedDict()
+_MAX_CACHE_SIZE = 2
+def _get_from_cache(key):
+    try:
+        value = _init_nltk_cache.pop(key)
+        _init_nltk_cache[key] = value  # move to end
+        return value
+    except KeyError:
+        return None
+
+def _set_cache(key, value):
+    if key in _init_nltk_cache:
+        _init_nltk_cache.pop(key)
+    elif len(_init_nltk_cache) >= _MAX_CACHE_SIZE:
+        _init_nltk_cache.popitem(last=False)  # evict LRU
+    _init_nltk_cache[key] = value
+
+
+class NLTKUnavailable(Exception):
+    pass
+
+
+def _init_nltk(download_list:Optional[Iterable[str]]=None,allow_download: bool = False, language: str = "english",keep_words:Optional[Iterable[str]]=None,remove_words:Optional[Iterable[str]]=None)->dict[str,object]:
+    """
+    Lazy initialize and return a dict with objects: tokenizer, stopwords_set, stemmer/lemmatizer.
+    Raises NLTKUnavailable if nltk not present and allow_download is False.
+    """
+    env=None
+    download_tuple = tuple(sorted([d for d in (download_list or []) if d]))
+    keep_tuple = tuple(sorted([k for k in (keep_words or []) if k]))
+    remove_tuple = tuple(sorted([r for r in (keep_words or []) if r]))
+    key = (download_tuple, bool(allow_download), language, keep_tuple, remove_tuple)
+    env=_get_from_cache(key)
+    if env is not None:
+        return env
+
+    try:
+        nltk = importlib.import_module("nltk")
+    except ImportError:
+        raise NLTKUnavailable("nltk is not installed")
+
+    # helper to check resource and optionally download
+    def _ensure(resource_name: str, download_name: Optional[str] = None):
+        try:
+            nltk.data.find(resource_name)
+        except LookupError:
+            if allow_download:
+                download_target = download_name or resource_name
+                nltk.download(download_target, quiet=True)
+            else:
+                raise LookupError(f"NLTK resource '{resource_name}' not found. Set allow_download=True or install resources manually.")
+
+    tokenizer=None
+    stopwords_set = None
+    stemmer = None
+    lemmatizer = None
+    # punkt is used by word_tokenize
+    if 'tokenizer' in download_list:
+        _ensure("tokenizers/punkt", "punkt")
+        tokenizer = nltk.word_tokenize
+        
+
+    
+    if 'stopwords' in download_list:
+        _ensure("corpora/stopwords", "stopwords")
+        from nltk.corpus import stopwords as _nltk_stopwords
+        stopwords_set = set(_nltk_stopwords.words(language))
+        if isinstance(keep_words,(list,tuple)) and len(keep_words)>0:
+            for kword in keep_words:
+                stopwords_set.discard(kword)
+        if isinstance(remove_words,(list,tuple)) and len(remove_words)>0:
+            for rword in remove_words:
+                stopwords_set.add(rword)
+        
+
+    
+    # Initialize both, user picks which to use
+    if 'stemming' in download_list:
+        from nltk.stem import PorterStemmer
+        stemmer = PorterStemmer()
+    if 'lemmatization' in download_list:
+        _ensure("corpora/wordnet", "wordnet")
+        from nltk.stem import WordNetLemmatizer
+        lemmatizer = WordNetLemmatizer()
+    env = {
+        "nltk": nltk,
+        "tokenizer": tokenizer,
+        "stopwords": stopwords_set,
+        "stemmer": stemmer,
+        "lemmatizer": lemmatizer,
+    }
+    _set_cache(key,env)
+    return env
+def apply_nltk(
+        df:pd.DataFrame,
+        text_column:str,
+        output_column:str="claeaned_nltk",
+        apply_case:Optional[Literal['lower','upper','sentence','title']]=None,
+        allow_download:bool=False,
+        remove_stopwords:bool=False,
+        keep_words:list=["not","no","off"],
+        remove_words:list=[],
+        use_tokenizer:bool=False,
+        language:str='english',
+        canonicalization:Optional[Literal['stemming', 'lemmatization']]=None
+        )->pd.DataFrame:
+    """
+    Apply advanced text preprocessing using optional NLTK-based features.
+
+    This function performs configurable text normalization on a specified
+    DataFrame column, including case transformation, tokenization,
+    stopword removal, and canonicalization (stemming or lemmatization).
+    NLTK is treated as an optional dependency and is only initialized
+    when explicitly required by the chosen options.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame containing the text data.
+
+    text_column : str
+        Name of the column in `df` that contains text to be processed.
+
+    output_column : str, default="claeaned_nltk"
+        Name of the output column where the processed text will be stored.
+
+    apply_case : {"lower", "upper", "sentence", "title"}, optional
+        Case transformation to apply to the text:
+
+    allow_download : bool, default=False
+        If True, automatically downloads required NLTK resources
+        (e.g., punkt, stopwords, wordnet) when missing.
+        If False, missing resources will raise an error.
+
+    remove_stopwords : bool, default=False
+        If True, removes stopwords using the specified language.
+
+    keep_words : list of str, default=["not", "no", "off"]
+        Words that should be retained even if stopword removal is enabled.
+        Useful for preserving negations.
+
+    remove_words : list of str, default=[]
+        Explicit list of words to remove from the text regardless
+        of stopword settings.
+
+    use_tokenizer : bool, default=False
+        If True, uses NLTK's tokenizer (requires `punkt`).
+        If False, falls back to a lightweight whitespace-based tokenizer.
+
+    language : str, default="english"
+        Language used for stopword removal.
+
+    canonicalization : {"stemming", "lemmatization"}, optional
+        Word normalization strategy:
+        - "stemming"       : applies Porter stemming
+        - "lemmatization"  : applies WordNet lemmatization
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of the input DataFrame with an additional column
+        containing the processed text.
+
+    Raises
+    ------
+    KeyError
+        If `text_column` does not exist in the DataFrame.
+
+    ImportError
+        If NLTK is required but not installed.
+
+    LookupError
+        If required NLTK resources are missing and `allow_download=False`.
+
+    Notes
+    -----
+    - NLTK initialization and resource loading are cached internally
+      to avoid repeated overhead across multiple calls.
+
+    """
+    if text_column not in df.columns:
+        raise IndexError(f"Column '{text_column}' not found.") 
+    df=df.copy()
+    text_field = df[text_column].astype('str')
+    tokenizer: Callable[[str], list[str]] = None
+    stopwords_set: Optional[set[str]] = set()
+    stemmer = None
+    lemmatizer = None
+    download_list = []
+    if canonicalization:
+        download_list.append(canonicalization)
+    if remove_stopwords:
+        download_list.append('stopwords')
+    if use_tokenizer:
+        download_list.append('tokenizer')
+    try:
+        env = _init_nltk(download_list=download_list,allow_download=allow_download, language=language,keep_words=keep_words,remove_words=remove_words)
+        tokenizer = env["tokenizer"]
+        stopwords_set = env["stopwords"]
+        stemmer = env["stemmer"]
+        lemmatizer = env["lemmatizer"]
+    except (NLTKUnavailable, LookupError) as e:
+        warnings.warn(f"NLTK unavailable or missing corpora: Falling back to lightweight tokenizer. Set allow_download=True to auto-download resources. {e}", UserWarning,stacklevel=2)
+
+
+    def _apply(text):
+        text=text.lower()
+        if use_tokenizer:
+            text = tokenizer(text)
+        else:
+            text = text.split()
+        
+        if canonicalization == 'stemming':
+            text = [stemmer.stem(word) for word in text if word not in stopwords_set]
+        elif canonicalization == 'lemmatization':
+            text = [lemmatizer.lemmatize(word) for word in text if word not in stopwords_set]
+        else:
+            warnings.warn("No canonicalization used",UserWarning,stacklevel=2)
+            if remove_stopwords:
+                text = [word for word in text if word not in stopwords_set]
+        
+        text =' '.join(text)
+        if apply_case=="upper":
+            text=text.upper()
+        elif apply_case=="sentence":
+            text=text.capitalize()
+        elif apply_case=="title":
+            text=text.title()
+        return text 
+    text_field = text_field.apply(_apply)
+    df[output_column]=text_field
+    return df  
+    
