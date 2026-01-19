@@ -1,39 +1,57 @@
+"""
+AutoML utilities for dskit library.
+"""
+
 import pandas as pd
 import numpy as np
+import warnings
+
+from sklearn.model_selection import cross_val_score
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+from .exceptions import DependencyError, InvalidParameterError
+
+# Optional imports
 try:
     from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
     from hyperopt.early_stop import no_progress_loss
+    HYPEROPT_AVAILABLE = True
 except ImportError:
     fmin = tpe = hp = STATUS_OK = Trials = no_progress_loss = None
+    HYPEROPT_AVAILABLE = False
+
 try:
     import optuna
+    OPTUNA_AVAILABLE = True
 except ImportError:
     optuna = None
-from sklearn.model_selection import cross_val_score
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-import warnings
+    OPTUNA_AVAILABLE = False
+
+
+def _validate_task(task):
+    """Validate task is 'classification' or 'regression'."""
+    task = task.lower().strip()
+    if task not in ['classification', 'regression']:
+        raise InvalidParameterError('task', task, ['classification', 'regression'])
+    return task
+
 
 def hyperopt_optimization(model_class, X, y, param_space, max_evals=50, task='classification'):
     """
     Hyperparameter optimization using Hyperopt.
     """
-    if fmin is None:
-        print("Hyperopt not installed. Please install it using 'pip install hyperopt'")
-        return None
+    if not HYPEROPT_AVAILABLE:
+        raise DependencyError('hyperopt', 'Hyperopt optimization', 'pip install hyperopt')
+    
+    task = _validate_task(task)
     
     def objective(params):
-        # Convert params to appropriate types
         for key, value in params.items():
             if isinstance(value, float) and value.is_integer():
                 params[key] = int(value)
         
         model = model_class(**params)
-        
-        # Cross-validation score
-        if task == 'classification':
-            scoring = 'accuracy'
-        else:
-            scoring = 'r2'
+        scoring = 'accuracy' if task == 'classification' else 'r2'
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -51,16 +69,17 @@ def hyperopt_optimization(model_class, X, y, param_space, max_evals=50, task='cl
     
     return best, trials
 
+
 def optuna_optimization(model_class, X, y, param_suggestions, max_evals=50, task='classification'):
     """
     Hyperparameter optimization using Optuna.
     """
-    if optuna is None:
-        print("Optuna not installed. Please install it using 'pip install optuna'")
-        return None
+    if not OPTUNA_AVAILABLE:
+        raise DependencyError('optuna', 'Optuna optimization', 'pip install optuna')
+    
+    task = _validate_task(task)
     
     def objective(trial):
-        # Build parameter dictionary based on suggestions
         params = {}
         for param_name, param_config in param_suggestions.items():
             if param_config['type'] == 'int':
@@ -71,12 +90,7 @@ def optuna_optimization(model_class, X, y, param_suggestions, max_evals=50, task
                 params[param_name] = trial.suggest_categorical(param_name, param_config['choices'])
         
         model = model_class(**params)
-        
-        # Cross-validation score
-        if task == 'classification':
-            scoring = 'accuracy'
-        else:
-            scoring = 'r2'
+        scoring = 'accuracy' if task == 'classification' else 'r2'
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -84,21 +98,21 @@ def optuna_optimization(model_class, X, y, param_suggestions, max_evals=50, task
         
         return scores.mean()
     
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=max_evals)
     
     return study.best_params, study
+
 
 def grid_search_custom(model_class, X, y, param_grid, cv=3):
     """
     Custom grid search implementation.
     """
     from sklearn.model_selection import ParameterGrid
-    from itertools import product
     
     results = []
     
-    # Generate all parameter combinations
     for params in ParameterGrid(param_grid):
         model = model_class(**params)
         scores = cross_val_score(model, X, y, cv=cv)
@@ -109,24 +123,16 @@ def grid_search_custom(model_class, X, y, param_grid, cv=3):
             'scores': scores
         })
     
-    # Sort by mean score (descending)
     results.sort(key=lambda x: x['mean_score'], reverse=True)
-    
     return results
+
 
 def bayesian_optimization_simple(model_class, X, y, param_bounds, max_evals=50, task='classification'):
     """
     Simple Bayesian optimization using random search with Gaussian Process.
     """
-    try:
-        from sklearn.gaussian_process import GaussianProcessRegressor
-        from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
-    except ImportError:
-        print("Gaussian Process not available. Using random search instead.")
-        return random_search_optimization(model_class, X, y, param_bounds, max_evals, task)
-    
-    # Simple random search for now (can be extended with GP)
     return random_search_optimization(model_class, X, y, param_bounds, max_evals, task)
+
 
 def random_search_optimization(model_class, X, y, param_bounds, max_evals=50, task='classification'):
     """
@@ -134,10 +140,10 @@ def random_search_optimization(model_class, X, y, param_bounds, max_evals=50, ta
     """
     import random
     
+    task = _validate_task(task)
     results = []
     
     for _ in range(max_evals):
-        # Generate random parameters
         params = {}
         for param_name, bounds in param_bounds.items():
             if bounds['type'] == 'int':
@@ -149,12 +155,7 @@ def random_search_optimization(model_class, X, y, param_bounds, max_evals=50, ta
         
         try:
             model = model_class(**params)
-            
-            if task == 'classification':
-                scoring = 'accuracy'
-            else:
-                scoring = 'r2'
-            
+            scoring = 'accuracy' if task == 'classification' else 'r2'
             scores = cross_val_score(model, X, y, cv=3, scoring=scoring)
             
             results.append({
@@ -167,31 +168,21 @@ def random_search_optimization(model_class, X, y, param_bounds, max_evals=50, ta
             print(f"Error with params {params}: {e}")
             continue
     
-    # Sort by mean score (descending)
     results.sort(key=lambda x: x['mean_score'], reverse=True)
-    
     return results
+
 
 def get_default_param_space(model_name, task='classification'):
     """
     Get default parameter spaces for common models.
     """
     if model_name == 'random_forest':
-        if task == 'classification':
-            return {
-                'n_estimators': {'type': 'int', 'low': 50, 'high': 200},
-                'max_depth': {'type': 'int', 'low': 3, 'high': 20},
-                'min_samples_split': {'type': 'int', 'low': 2, 'high': 10},
-                'min_samples_leaf': {'type': 'int', 'low': 1, 'high': 5}
-            }
-        else:
-            return {
-                'n_estimators': {'type': 'int', 'low': 50, 'high': 200},
-                'max_depth': {'type': 'int', 'low': 3, 'high': 20},
-                'min_samples_split': {'type': 'int', 'low': 2, 'high': 10},
-                'min_samples_leaf': {'type': 'int', 'low': 1, 'high': 5}
-            }
-    
+        return {
+            'n_estimators': {'type': 'int', 'low': 50, 'high': 200},
+            'max_depth': {'type': 'int', 'low': 3, 'high': 20},
+            'min_samples_split': {'type': 'int', 'low': 2, 'high': 10},
+            'min_samples_leaf': {'type': 'int', 'low': 1, 'high': 5}
+        }
     elif model_name == 'xgboost':
         return {
             'n_estimators': {'type': 'int', 'low': 50, 'high': 200},
@@ -199,7 +190,6 @@ def get_default_param_space(model_name, task='classification'):
             'learning_rate': {'type': 'float', 'low': 0.01, 'high': 0.3},
             'subsample': {'type': 'float', 'low': 0.6, 'high': 1.0}
         }
-    
     elif model_name == 'lightgbm':
         return {
             'n_estimators': {'type': 'int', 'low': 50, 'high': 200},
@@ -207,36 +197,36 @@ def get_default_param_space(model_name, task='classification'):
             'learning_rate': {'type': 'float', 'low': 0.01, 'high': 0.3},
             'feature_fraction': {'type': 'float', 'low': 0.4, 'high': 1.0}
         }
-    
     else:
-        # Generic parameter space
-        return {
-            'random_state': {'type': 'int', 'low': 0, 'high': 100}
-        }
+        return {'random_state': {'type': 'int', 'low': 0, 'high': 100}}
+
 
 def auto_tune_model(model_class, X, y, method='random', max_evals=50, task='classification', model_name=None):
     """
     Automatically tune hyperparameters using the specified method.
     """
+    if method not in ['random', 'optuna', 'hyperopt']:
+        raise InvalidParameterError('method', method, ['random', 'optuna', 'hyperopt'])
+    
+    task = _validate_task(task)
     print(f"Starting hyperparameter tuning with {method} search...")
     
-    # Get parameter space
-    if model_name:
-        param_space = get_default_param_space(model_name, task)
-    else:
-        param_space = get_default_param_space('random_forest', task)  # Default
+    param_space = get_default_param_space(model_name or 'random_forest', task)
     
     if method == 'random':
         results = random_search_optimization(model_class, X, y, param_space, max_evals, task)
         best_params = results[0]['params']
         best_score = results[0]['mean_score']
     
-    elif method == 'optuna' and optuna is not None:
+    elif method == 'optuna':
+        if not OPTUNA_AVAILABLE:
+            raise DependencyError('optuna', 'Optuna optimization', 'pip install optuna')
         best_params, study = optuna_optimization(model_class, X, y, param_space, max_evals, task)
         best_score = study.best_value
     
-    elif method == 'hyperopt' and fmin is not None:
-        # Convert param space to hyperopt format
+    elif method == 'hyperopt':
+        if not HYPEROPT_AVAILABLE:
+            raise DependencyError('hyperopt', 'Hyperopt optimization', 'pip install hyperopt')
         hyperopt_space = {}
         for param, config in param_space.items():
             if config['type'] == 'int':
@@ -249,15 +239,8 @@ def auto_tune_model(model_class, X, y, method='random', max_evals=50, task='clas
         best_params, trials = hyperopt_optimization(model_class, X, y, hyperopt_space, max_evals, task)
         best_score = -min([trial['result']['loss'] for trial in trials.trials])
     
-    else:
-        print(f"Method '{method}' not available. Using random search.")
-        results = random_search_optimization(model_class, X, y, param_space, max_evals, task)
-        best_params = results[0]['params']
-        best_score = results[0]['mean_score']
-    
     print(f"Best parameters: {best_params}")
     print(f"Best score: {best_score:.4f}")
     
-    # Create and return the best model
     best_model = model_class(**best_params)
     return best_model, best_params, best_score
