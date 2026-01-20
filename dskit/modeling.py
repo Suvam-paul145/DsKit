@@ -1,3 +1,7 @@
+"""
+Machine Learning modeling utilities for dskit.
+"""
+
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
@@ -8,6 +12,17 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, mean_squared_error, mean_absolute_error, r2_score
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
+from .exceptions import ModelNotFoundError, ModelNotTrainedError, InvalidParameterError
+
+
+def _validate_task(task):
+    """Validate task is 'classification' or 'regression'."""
+    task = task.lower().strip()
+    if task not in ['classification', 'regression']:
+        raise InvalidParameterError('task', task, ['classification', 'regression'])
+    return task
+
+
 class QuickModel:
     """
     A wrapper class for training ML models with simple commands.
@@ -15,7 +30,8 @@ class QuickModel:
     def __init__(self, model_type=None, model_name=None, task='classification'):
         # Support both model_type and model_name for backwards compatibility
         self.model_name = model_type or model_name
-        self.task = task
+        self.task = _validate_task(task)
+        self.is_fitted = False
         self.model = self._get_model()
         
     def _get_model(self):
@@ -51,48 +67,42 @@ class QuickModel:
             }
             
         if self.model_name not in models:
-            raise ValueError(f"Model '{self.model_name}' not supported. Choose from {list(models.keys())}")
+            raise ModelNotFoundError(self.model_name, models.keys())
             
         return models[self.model_name]
     
     def fit(self, X, y):
         self.model.fit(X, y)
+        self.is_fitted = True
         return self
     
     def predict(self, X):
+        if not self.is_fitted:
+            raise ModelNotTrainedError("predict")
         return self.model.predict(X)
     
     def predict_proba(self, X):
+        if not self.is_fitted:
+            raise ModelNotTrainedError("predict_proba")
         if hasattr(self.model, 'predict_proba'):
             return self.model.predict_proba(X)
         else:
-            raise NotImplementedError("This model does not support predict_proba")
+            raise InvalidParameterError('model', self.model_name, 
+                message=f"Model '{self.model_name}' doesn't support predict_proba")
     
     def score(self, X, y):
         """Calculate accuracy score for classification or R2 for regression"""
+        if not self.is_fitted:
+            raise ModelNotTrainedError("score")
         return self.model.score(X, y)
+
 
 def compare_models(X_train, y_train, X_test, y_test, models=None, task='classification'):
     """
     Trains multiple ML models and compares their performance.
-    
-    Parameters:
-    -----------
-    X_train : array-like
-        Training features
-    y_train : array-like
-        Training labels
-    X_test : array-like
-        Test features
-    y_test : array-like
-        Test labels
-    models : list, optional
-        List of model abbreviations to compare. 
-        For classification: ['lr', 'rf', 'gb', 'svc', 'knn', 'dt']
-        For regression: ['lr', 'ridge', 'lasso', 'rf', 'gb', 'svr']
-    task : str
-        'classification' or 'regression'
     """
+    task = _validate_task(task)
+    
     if models is None:
         if task == 'classification':
             models = ['rf', 'gb', 'lr', 'dt']
@@ -111,7 +121,6 @@ def compare_models(X_train, y_train, X_test, y_test, models=None, task='classifi
         }
         metrics = ['Accuracy', 'Precision', 'Recall', 'F1']
     else:
-        from sklearn.linear_model import Ridge, Lasso
         model_map = {
             'lr': LinearRegression(),
             'ridge': Ridge(),
@@ -162,62 +171,20 @@ def compare_models(X_train, y_train, X_test, y_test, models=None, task='classifi
         
     return df_results
 
+
 def auto_hpo(X_train, y_train, X_test=None, y_test=None, model_type='rf', task='classification', 
              n_trials=20, scoring='accuracy', cv=3):
     """
     Performs automatic hyperparameter optimization using Optuna.
-    
-    Parameters:
-    -----------
-    X_train : array-like
-        Training features
-    y_train : array-like
-        Training labels
-    X_test : array-like, optional
-        Test features (for final evaluation)
-    y_test : array-like, optional
-        Test labels (for final evaluation)
-    model_type : str
-        Model abbreviation ('rf', 'gb', 'lr', etc.)
-    task : str
-        'classification' or 'regression'
-    n_trials : int
-        Number of optimization trials
-    scoring : str
-        Scoring metric ('accuracy', 'f1', 'r2', etc.)
-    cv : int
-        Number of cross-validation folds
-        
-    Returns:
-    --------
-    best_model : trained model
-        The best model with optimized parameters
-    best_params : dict
-        The best parameters found
     """
+    task = _validate_task(task)
+    
     try:
         import optuna
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:
-        print("Optuna not installed. Using basic hyperparameter tuning...")
-        # Fallback to simple default model
-        if task == 'classification':
-            if model_type in ['rf', 'random_forest']:
-                best_model = RandomForestClassifier(n_estimators=100, random_state=42)
-            elif model_type in ['gb', 'gradient_boosting']:
-                best_model = GradientBoostingClassifier(n_estimators=100, random_state=42)
-            else:
-                best_model = RandomForestClassifier(n_estimators=100, random_state=42)
-        else:
-            if model_type in ['rf', 'random_forest']:
-                best_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            elif model_type in ['gb', 'gradient_boosting']:
-                best_model = GradientBoostingRegressor(n_estimators=100, random_state=42)
-            else:
-                best_model = RandomForestRegressor(n_estimators=100, random_state=42)
-        
-        best_model.fit(X_train, y_train)
-        return best_model, {}
+        from .exceptions import DependencyError
+        raise DependencyError('optuna', 'hyperparameter optimization', 'pip install optuna')
     
     def objective(trial):
         if task == 'classification':
@@ -245,7 +212,7 @@ def auto_hpo(X_train, y_train, X_test=None, y_test=None, model_type='rf', task='
                     'random_state': 42
                 }
                 model = RandomForestClassifier(**params)
-        else:  # regression
+        else:
             if model_type in ['rf', 'random_forest']:
                 params = {
                     'n_estimators': trial.suggest_int('n_estimators', 50, 300),
@@ -271,7 +238,6 @@ def auto_hpo(X_train, y_train, X_test=None, y_test=None, model_type='rf', task='
                 }
                 model = RandomForestRegressor(**params)
         
-        # Cross-validation
         from sklearn.model_selection import cross_val_score
         scores = cross_val_score(model, X_train, y_train, cv=cv, scoring=scoring)
         return scores.mean()
@@ -279,7 +245,6 @@ def auto_hpo(X_train, y_train, X_test=None, y_test=None, model_type='rf', task='
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
     
-    # Train best model
     best_params = study.best_params
     best_params['random_state'] = 42
     
@@ -301,25 +266,29 @@ def auto_hpo(X_train, y_train, X_test=None, y_test=None, model_type='rf', task='
     best_model.fit(X_train, y_train)
     return best_model, best_params
 
+
 def auto_hpo_old(model, param_grid, X, y, method='grid', cv=3):
     """
     Performs automatic hyperparameter tuning (legacy function).
     """
+    if method not in ['grid', 'random']:
+        raise InvalidParameterError('method', method, ['grid', 'random'])
+    
     if method == 'grid':
         search = GridSearchCV(model, param_grid, cv=cv, n_jobs=-1)
-    elif method == 'random':
-        search = RandomizedSearchCV(model, param_grid, cv=cv, n_jobs=-1)
     else:
-        raise ValueError("Method must be 'grid' or 'random'")
+        search = RandomizedSearchCV(model, param_grid, cv=cv, n_jobs=-1)
         
     search.fit(X, y)
     print(f"Best Params: {search.best_params_}")
     return search.best_estimator_
 
+
 def evaluate_model(model, X_test, y_test, task='classification'):
     """
     Provides evaluation metrics for a trained model.
     """
+    task = _validate_task(task)
     y_pred = model.predict(X_test)
     
     if task == 'classification':
@@ -342,10 +311,12 @@ def evaluate_model(model, X_test, y_test, task='classification'):
         print("MAE:", mean_absolute_error(y_test, y_pred))
         print("R2 Score:", r2_score(y_test, y_pred))
 
+
 def error_analysis(model, X_test, y_test, task='classification'):
     """
     Analyzes wrong predictions.
     """
+    task = _validate_task(task)
     y_pred = model.predict(X_test)
     
     if isinstance(X_test, pd.DataFrame):
